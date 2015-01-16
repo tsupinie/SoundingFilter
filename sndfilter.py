@@ -1,5 +1,45 @@
 
 import numpy as np
+from scipy.interpolate import interp1d
+
+def _splitProfile(prof, lb_idx, tol, _depth=0):
+    """
+    _splitProfile()
+    Purpose:    Thin a profile in such a way that none of the intermediate 
+                    values deviate from a linear interplation of the thinned
+                    values by more than a specified tolerance.
+    Arguments:  prof [type=np.ndarray]
+                    The profile to thin
+                lb_idx [type=int]
+                    The position (in the full profile) of the first index in 
+                    this segment of the profile.
+                tol [type=float]
+                    Tolerance on the linear interpolation
+    Returns:    A list of indices representing those in the thinned profile
+                    
+    """
+    interp = interp1d([0., len(prof) - 1.], [prof[0], prof[-1]])
+    interp_prof = interp(np.arange(float(len(prof))))
+
+    if np.abs(interp_prof - prof).max() < tol:
+        ret_val = [ lb_idx ]
+    else:
+        split_point = np.argmax(np.abs(prof - interp_prof))
+        if split_point > 1:
+            first_split = _splitProfile(prof[:split_point], lb_idx, tol, _depth=_depth + 1)
+        else:
+            first_split = [ lb_idx ]
+
+        if split_point < len(prof) - 2:
+            second_split = _splitProfile(prof[split_point:], lb_idx + split_point, tol, _depth=_depth + 1)
+        else:
+            second_split = [ lb_idx + split_point ]
+
+        ret_val = first_split + second_split
+
+    if _depth == 0:
+        ret_val += [ len(prof) - 1 ]
+    return ret_val
 
 def _windSigLevels(**snd):
     idxs = np.arange(snd['wdir'].shape[0])
@@ -107,8 +147,15 @@ def _mandatoryPresLevels(pres, tol=0.1):
 
     return mandatory_pres_idx
 
-def _findAddSigLevels(temp, pres):
-    return 
+def _findAddSigLevels(temp, pres, trop_idx, tol=[1.0, 2.0]):
+
+    cutoff_idx = min(np.argmin(np.abs(pres - 300)), trop_idx)
+
+    idxs_below = _splitProfile(temp[:cutoff_idx], 0, tol[0])[:-1]
+    idxs_above = _splitProfile(temp[cutoff_idx:], cutoff_idx, tol[1])
+    additional_idxs = np.sort(np.unique(np.concatenate((idxs_below, idxs_above))))
+
+    return additional_idxs
 
 def _thermSigLevels(**snd):
     """
@@ -118,9 +165,12 @@ def _thermSigLevels(**snd):
     Returns:    A list of indices represending the indices of the significant
                     levels.
     """
+
+    trop_idx = _findTropopause(**snd)
+
     inv_sl = _findInversions(snd['temp'], snd['pres'])
     iso_sl = _findIsothermals(snd['temp'], snd['pres'])
-    add_sl = _findAddSigLevels(snd['temp'], snd['pres'])
+    add_sl = _findAddSigLevels(snd['temp'], snd['pres'], trop_idx)
 
     therm_sl = np.concatenate((inv_sl, iso_sl, add_sl))
     return np.sort(therm_sl)
