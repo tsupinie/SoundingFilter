@@ -122,3 +122,5 @@ a standard isobaric surface, the following rules shall apply:
 
 (a) Extrapolation is permissible if, and only if, the pressure difference between the minimum pressure of the sounding and the isobaric surface for which the extrapolated value is being computed does not exceed one quarter of the pressure at which the extrapolated value is desired, provided the extrapolation does not extend through a pressure interval exceeding 25 hPa;
 (b) For the purpose of geopotential calculation, and for this purpose only, the sounding will be extrapolated, using two points only of the sounding curve on a T-log p diagram, namely that at the minimum pressure reached by the sounding and that at the press- ure given by the sum of this minimum pressure and the pressure difference, mentioned in (a) above.
+
+Paraphrased and parsed from: http://www.wmo.int/pages/prog/www/WMOCodes/Manual/WMO306_Vol-I-1-PartA.pdf
