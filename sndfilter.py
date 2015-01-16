@@ -135,7 +135,6 @@ def _findIsothermals(temp, pres, tol=0.5):
         for cidx in cand_idx:
             isotherm_idxs.extend([cidx[0], cidx[-1]])
 
-    print len(isotherm_idxs)
     return isotherm_idxs
 
 def _mandatoryPresLevels(pres, tol=0.1):
