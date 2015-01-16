@@ -9,6 +9,15 @@ def _windSigLevels(**snd):
 def _findInversions(temp, pres):
     return
 
+def _maxWind(**snd):
+    '''
+    _maxWind()
+    Purpose:    Find the level of the maximum wind in the profile
+    Arguments:  the snd dictionary.
+    Returns:    The index from the sounding of the maximum wind speed.
+    '''
+    return np.ma.argmax(snd['wspd'])
+
 def _findIsothermals(temp, pres, tol=0.5, min_depth=5):
     """
     _findIsothermals()
