@@ -58,7 +58,7 @@ def _maxWind(**snd):
     '''
     return np.ma.argmax(snd['wspd'])
 
-def _findIsothermals(temp, pres, tol=0.5, min_depth=5):
+def _findIsothermals(temp, pres, tol=0.5):
     """
     _findIsothermals()
     Purpose:    Find the significant levels associated with the tops and 
@@ -69,9 +69,6 @@ def _findIsothermals(temp, pres, tol=0.5, min_depth=5):
                     Pressure array in hPa
     Keywords:   tol [type=float]
                     Temperature tolerance on "isothermal."  Default is 0.5 C.
-                min_depth [type=float]
-                    Minimum number of points to consider a "layer."  Default is
-                    5 points.
     Returns:    A list of indices of the tops and bottoms of isothermal layers.
     """
 
@@ -121,7 +118,8 @@ def _findIsothermals(temp, pres, tol=0.5, min_depth=5):
             temp_layer = temp[cand_idxs]
 
         ret_val = []
-        if len(cand_idxs) >= min_depth:
+        pres_cand = pres[cand_idxs]
+        if len(pres_cand) > 0 and pres_cand.max() - pres_cand.min() >= 20:
             ret_val = [ cand_idxs ]
         return ret_val
 
@@ -137,6 +135,7 @@ def _findIsothermals(temp, pres, tol=0.5, min_depth=5):
         for cidx in cand_idx:
             isotherm_idxs.extend([cidx[0], cidx[-1]])
 
+    print len(isotherm_idxs)
     return isotherm_idxs
 
 def _mandatoryPresLevels(pres, tol=0.1):
