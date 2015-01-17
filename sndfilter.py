@@ -266,18 +266,3 @@ def soundingFilter(**snd):
     }
 
     return snd_filtered
-
-if __name__ == "__main__":
-    import Nio as nio
-
-    name_translate = {
-        'tdry':'temp',
-        'dp':'dewp',
-        'pres':'pres',
-        'wspd':'wspd',
-        'deg':'wdir',
-        'alt':'hght'
-    }
-
-    snd = dict( (name_translate[k], snd_file.variables[k][:]) for k in ['tdry', 'dp', 'pres', 'wspd', 'deg', 'alt'])
-    snd_filtered = soundingFilter(**snd)
