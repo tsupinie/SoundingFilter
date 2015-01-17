@@ -52,11 +52,25 @@ def _findInversions(temp, pres):
 def _maxWind(**snd):
     '''
     _maxWind()
-    Purpose:    Find the level of the maximum wind in the profile
+    Purpose:    Find the level of the maximum winds in the profile
     Arguments:  the snd dictionary.
     Returns:    The index from the sounding of the maximum wind speed.
+
+    Assumes that the winds are in knots.
     '''
-    return np.ma.argmax(snd['wspd'])
+    sorted_wind_idx = np.argsort(snd['wspd'])
+    sorted_winds = snd['wspd'][sorted_wind_idx]
+    max_winds = [sorted_wind_idx[0]]
+
+    for i in xrange(1,len(sorted_wind_idx)-1,1):
+        idx = sorted_wind_idx[i]
+        prev_wind = sorted_winds[i-1] * 0.514444 # Converts from kts to m/s
+        max_wind_i = sorted_winds[i] * 0.514444 # Converts from kts to m/s
+        next_wind = sorted_winds[i+1] * 0.514444 # Converts from kts to m/s
+        if prev_wind - max_wind_i > 10 and max_wind_i - next_wind > 10: # 10 m/s
+            max_winds.append(idx)
+
+    return max_winds
 
 def _findIsothermals(temp, pres, tol=0.5):
     """
@@ -140,10 +154,10 @@ def _findIsothermals(temp, pres, tol=0.5):
 def _mandatoryPresLevels(pres, tol=0.1):
     '''
         Searches for the surface, 1000, 925, 850, 700,
-        500, 400, 300, 250, 200, 150, 100, 70, 50, and 10 mb.
+        500, 400, 300, 250, 200, 150, 100, 70, 50, 30, 20, and 10 mb.
     '''
     mandatory_pres = np.asarray([1000, 925, 850, 700, 500, 400, 300, 250, 200,\
-                      150, 100, 70, 50, 10])
+                      150, 100, 70, 50, 30, 20, 10])
     mandatory_pres_idx = np.ones(mandatory_pres.shape, dtype=int)
     pres = np.round(pres,0)
     for i in xrange(len(mandatory_pres_idx)):
