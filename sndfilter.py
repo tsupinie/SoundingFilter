@@ -1,6 +1,7 @@
 
 import numpy as np
 from scipy.interpolate import interp1d
+from pylab import *
 
 def _centered2nd(prof):
     return prof[2:] - 2 * prof[1:-1] + prof[:-2]
@@ -46,10 +47,47 @@ def _splitProfile(prof, lb_idx, tol, _depth=0):
 
 def _windSigLevels(**snd):
     max_wind_sl = _maxWind(snd['wspd'], snd['wdir'], snd['pres'])
-    return max_wind_sl
+    idxs_windSpdSig = _splitProfile(snd['wspd']*0.514444, 0, 5)
+    idxs = idxs_windSpdSig
+    return idxs
 
-def _findInversions(temp, pres):
-    return np.array([], dtype=np.int32)
+
+def groupLayers(cand_layers):
+    """
+    Function to group candidate layers into contiguous regions.
+    """
+    group_layers = np.where(np.diff(cand_layers) == 1, 1, 0)
+    try:
+        breaks = np.where(group_layers == 0)[0] + 1
+    except IndexError:
+        breaks = []
+    breaks = [ 0 ] + list(breaks) + [ -1 ]
+
+    cand_idxs = []
+    for idx in xrange(len(breaks) - 1):
+        cand_idxs.append(cand_layers[breaks[idx]:breaks[idx + 1]])
+    
+    return cand_idxs
+
+def _findInversions(temp, dewp, pres, trop_idx):
+    lr_layers = np.diff(temp)
+    cand_layers = np.where(lr_layers > 0)[0]
+    groupedLayers = groupLayers(cand_layers)
+    rh = _RH(temp, dewp, pres)
+
+    inversion_layers = []
+    for layer in groupedLayers:
+        lbot = layer[0]
+        ltop = layer[-1]
+        if pres[lbot] < 300 or lbot > trop_idx:
+            break
+        elif (temp[ltop] - temp[lbot] >= 2.5) or \
+             (np.abs(rh[ltop] - rh[lbot]) > 20) or \
+             (pres[lbot] - pres[ltop] >= 20):
+            inversion_layers.append(lbot)
+            inversion_layers.append(ltop)
+#   print inversion_layers
+    return np.asarray(inversion_layers, dtype=int)
 
 def _maxWind(wspd, wdir, pres, min_wspd=(30 * 1.94), min_diff=(10 * 1.94), smooth_pts=11):
     '''
@@ -200,6 +238,31 @@ def _findAddSigLevels(temp, pres, trop_idx, tol=[1.0, 2.0]):
 
     return additional_idxs
 
+def _RH(temp, dwpt, pres):
+    return 100*(np.exp((17.625*dwpt)/(243.04+dwpt))/np.exp((17.625*temp)/(243.04+temp))) 
+
+def _findSigRHLevels(temp, dwpt, pres, tol=[15]):
+    """
+    _findSigRHLevels()
+    Purpose:    Convert dwpt to relative humidity and find the
+                relative humidity significant levels.
+    Keywords:   temp [type=np.ndarray]
+                    Temperature array in degrees C
+                dewp [type=np.ndarray]
+                    Dewpoint array in degrees C
+                pres [type=np.ndarray]
+                    Pressure array in hPa
+                tol [type=float]
+                    Tolerance on the linear interpolation                        
+    Returns:    A list of indices represending the indices of the significant RH
+                    levels.
+    """
+    rh = _RH(temp, dwpt, pres)
+    idxs_rhSig = _splitProfile(rh, 0, tol[0])
+    additional_idxs = np.sort(idxs_rhSig)
+
+    return additional_idxs
+
 def _thermSigLevels(**snd):
     """
     _thermSigLevels()
@@ -211,7 +274,7 @@ def _thermSigLevels(**snd):
 
     trop_idx = _findTropopause(**snd)
 
-    inv_sl = _findInversions(snd['temp'], snd['pres'])
+    inv_sl = _findInversions(snd['temp'], snd['dewp'], snd['pres'], trop_idx)
     iso_sl = _findIsothermals(snd['temp'], snd['pres'])
     add_sl = _findAddSigLevels(snd['temp'], snd['pres'], trop_idx)
 
@@ -277,11 +340,39 @@ def soundingFilter(**snd):
                     levels, missing observations will be filled with np.nan.
     """
 
+    from datetime import datetime
+
     pres_ml = _mandatoryPresLevels(snd['pres'])
-    _findTropopause(**snd)
+    trop_idx = _findTropopause(**snd)
     therm_sl = _thermSigLevels(**snd)
-    
+    rh_sl = _findSigRHLevels(snd['temp'], snd['dewp'], snd['pres'])
     wind_sl = _windSigLevels(**snd)
+
+    all_idxs = np.concatenate((pres_ml, [trop_idx], therm_sl, rh_sl, wind_sl))
+    all_idxs = np.unique(all_idxs[np.isfinite(all_idxs)])
+    all_idxs = np.asarray(all_idxs[all_idxs >= 0], dtype=int)
+
+    """
+    ticks = np.concatenate((np.arange(1000,0,-100), [50,30, 20, 10]))
+    subplot(121)
+    gca().set_yscale('log')
+    ylabel("Pressure [mb]")
+    xlabel("Temperature [C]")
+    plot(snd['temp'], snd['pres'], 'r-')
+    plot(snd['dewp'], snd['pres'], 'g-')
+    plot(snd['temp'][all_idxs], snd['pres'][all_idxs], 'ko')
+    plot(snd['dewp'][all_idxs], snd['pres'][all_idxs], 'ko') 
+    gca().invert_yaxis()
+    yticks(ticks, np.asarray(ticks, dtype=str))
+    subplot(122)
+    gca().set_yscale('log')
+    xlabel("Wind Speed [kts]")
+    plot(snd['wspd'], snd['pres'], 'b-')
+    plot(snd['wspd'][all_idxs], snd['pres'][all_idxs], 'ko')
+    yticks(ticks, np.asarray(ticks, dtype=str))
+    gca().invert_yaxis()
+    show()
+    """
 
     pres_sl = np.union1d(therm_sl, wind_sl)
     missing_therm = np.searchsorted(pres_sl, therm_sl)
