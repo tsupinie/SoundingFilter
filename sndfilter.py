@@ -2,6 +2,9 @@
 import numpy as np
 from scipy.interpolate import interp1d
 
+def _centered2nd(prof):
+    return prof[2:] - 2 * prof[1:-1] + prof[:-2]
+
 def _splitProfile(prof, lb_idx, tol, _depth=0):
     """
     _splitProfile()
@@ -42,14 +45,13 @@ def _splitProfile(prof, lb_idx, tol, _depth=0):
     return ret_val
 
 def _windSigLevels(**snd):
-    idxs = np.arange(snd['wdir'].shape[0])
-    np.random.shuffle(idxs)
-    return np.sort(idxs[:20])
+    max_wind_sl = _maxWind(snd['wspd'], snd['wdir'], snd['pres'])
+    return max_wind_sl
 
 def _findInversions(temp, pres):
-    return
+    return np.array([], dtype=np.int32)
 
-def _maxWind(**snd):
+def _maxWind(wspd, wdir, pres, min_wspd=(30 * 1.94), min_diff=(10 * 1.94), smooth_pts=11):
     '''
     _maxWind()
     Purpose:    Find the level of the maximum winds in the profile
@@ -58,19 +60,39 @@ def _maxWind(**snd):
 
     Assumes that the winds are in knots.
     '''
-    sorted_wind_idx = np.argsort(snd['wspd'])
-    sorted_winds = snd['wspd'][sorted_wind_idx]
-    max_winds = [sorted_wind_idx[0]]
 
-    for i in xrange(1,len(sorted_wind_idx)-1,1):
-        idx = sorted_wind_idx[i]
-        prev_wind = sorted_winds[i-1] * 0.514444 # Converts from kts to m/s
-        max_wind_i = sorted_winds[i] * 0.514444 # Converts from kts to m/s
-        next_wind = sorted_winds[i+1] * 0.514444 # Converts from kts to m/s
-        if prev_wind - max_wind_i > 10 and max_wind_i - next_wind > 10: # 10 m/s
-            max_winds.append(idx)
+    if np.ma.is_masked(wspd):
+        wspd_mask = wspd.mask
+        wspd = wspd[np.where(~wspd_mask)]
 
-    return max_winds
+    # Smooth the wind profile
+    wgts = np.ones((smooth_pts,)) / smooth_pts
+    wspd_smooth = np.convolve(wspd, wgts, mode='same')
+
+    # Find the indices of the maxima in the smoothed profile
+    max_idxs = np.where(
+        (wspd_smooth[1:-1] > wspd_smooth[:-2]) & 
+        (wspd_smooth[1:-1] >= wspd_smooth[2:])
+    )[0] + 1
+
+    # Sort them by wind speed
+    sorted_max_idxs = np.argsort(wspd[max_idxs])[::-1]
+    max_idxs = max_idxs[sorted_max_idxs]
+
+    # Cut off the wind speeds at 30 m/s, leaving only the max wind speed
+    max_idxs = np.concatenate((
+        max_idxs[:1],
+        max_idxs[np.where(wspd[max_idxs[1:]] > min_wspd)]
+    ))
+
+    if len(max_idxs) > 1:
+        # If we still have any other wind maxima left, cut off the ones that 
+        #  are less than 10 m/s less than the previous
+        ws_diff = np.diff(wspd[max_idxs])
+        diff_cutoff = np.where(ws_diff < min_diff)[0][0] + 1
+        max_idxs = max_idxs[:diff_cutoff]
+
+    return max_idxs
 
 def _findIsothermals(temp, pres, tol=0.5):
     """
