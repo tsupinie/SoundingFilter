@@ -3,8 +3,88 @@ import numpy as np
 from scipy.interpolate import interp1d
 from pylab import *
 
-def _centered2nd(prof):
-    return prof[2:] - 2 * prof[1:-1] + prof[:-2]
+MS2KTS = 1.94
+MISSING = np.nan
+
+def _removedMasked(ary):
+    if np.ma.is_masked(ary):
+        ary_mask = ary.mask
+        ary = ary[np.where(~ary_mask)]
+    return ary
+
+def _RH(temp, dwpt, pres):
+    return 100*(np.exp((17.625*dwpt)/(243.04+dwpt))/np.exp((17.625*temp)/(243.04+temp))) 
+
+def _groupLayers(cand_layers):
+    """
+    Function to group candidate layers into contiguous regions.
+    """
+    group_layers = np.where(np.diff(cand_layers) == 1, 1, 0)
+    try:
+        breaks = np.where(group_layers == 0)[0] + 1
+    except IndexError:
+        breaks = []
+    breaks = [ 0 ] + list(breaks) + [ -1 ]
+
+    cand_idxs = []
+    for idx in xrange(len(breaks) - 1):
+        cand_idxs.append(cand_layers[breaks[idx]:breaks[idx + 1]])
+    
+    return cand_idxs
+
+def _mandatoryPresLevels(pres, tol=0.1):
+    '''
+        Searches for the surface, 1000, 925, 850, 700,
+        500, 400, 300, 250, 200, 150, 100, 70, 50, 30, 20, and 10 mb.
+    '''
+    mandatory_pres = np.asarray([1000, 925, 850, 700, 500, 400, 300, 250, 200,\
+                      150, 100, 70, 50, 30, 20, 10])
+    mandatory_pres_idx = np.ones(mandatory_pres.shape, dtype=int)
+    pres = np.round(pres,0)
+    for i in xrange(len(mandatory_pres_idx)):
+        ind = np.where(np.fabs(pres - mandatory_pres[i]) < tol)[0]
+        if len(ind) == 0:
+            ind = [-9999]
+        mandatory_pres_idx[i] = ind[0]
+
+    return mandatory_pres_idx
+
+def _findTropopause(**snd):
+    '''
+        Finding the tropopause level using the WMO definition of a 
+        tropopause as being the lowest level where the 2 km layer
+        aloft has a lapse rate greater than 2 C/km.
+        
+        The algorithm below was taken from:
+        http://www.inscc.utah.edu/~reichler/publications/papers/2003_tropo.pdf
+    '''
+
+    def reverseDiff(array):
+        return array[1:] + array[:-1]
+
+    above_500 = np.where((snd['pres'] > 75) & (snd['pres'] < 550))[0]
+    dT = np.diff(snd['temp'][above_500])
+    dp = np.diff(snd['pres'][above_500])
+    at = reverseDiff(snd['temp'][above_500])
+    ap = reverseDiff(snd['pres'][above_500])
+    ah = reverseDiff(snd['hght'][above_500])
+    R = 287.
+    g = 9.81
+    Cp = 1004.
+    kappa = R / Cp
+
+    halfp = ap / 2.
+    halfh = ah / 2.
+    halfgamma = (dT/dp) * (ap/at) * (kappa * g/R)
+    idx = np.where(halfgamma > 0.002)[0]
+    for i in idx:
+        hbot = halfh[i]
+        htop = hbot + 2000.
+        htop_idx = np.argmin(np.abs(halfh - htop))
+        mean_lapse = np.mean(halfgamma[i:htop_idx])
+        if mean_lapse > 0.002:
+            return np.ma.argmin(np.fabs(snd['pres']-halfp[i]))    
+    return MISSING
 
 def _splitProfile(prof, lb_idx, tol, _depth=0):
     """
@@ -45,50 +125,19 @@ def _splitProfile(prof, lb_idx, tol, _depth=0):
         ret_val += [ len(prof) - 1 ]
     return ret_val
 
-def _windSigLevels(**snd):
-    max_wind_sl = _maxWind(snd['wspd'], snd['wdir'], snd['pres'])
-    wind_spd_sl = _splitProfile(snd['wspd']*0.514444, 0, 5)
-    return np.concatenate((max_wind_sl, wind_spd_sl))
+def _unfoldWindDir(wdir):
+    fold_idxs = np.where((wdir[:-1] > 350) & (wdir[1:] < 10) | (wdir[:-1] < 10) & (wdir[1:] > 350))[0]
+    wdir_unfold = wdir.copy()
 
+    for idx in fold_idxs:
+        if wdir[idx] > wdir[idx + 1]:
+            wdir_unfold[(idx + 1):] += 360
+        else:
+            wdir_unfold[(idx + 1):] -= 360
 
-def groupLayers(cand_layers):
-    """
-    Function to group candidate layers into contiguous regions.
-    """
-    group_layers = np.where(np.diff(cand_layers) == 1, 1, 0)
-    try:
-        breaks = np.where(group_layers == 0)[0] + 1
-    except IndexError:
-        breaks = []
-    breaks = [ 0 ] + list(breaks) + [ -1 ]
+    return wdir_unfold
 
-    cand_idxs = []
-    for idx in xrange(len(breaks) - 1):
-        cand_idxs.append(cand_layers[breaks[idx]:breaks[idx + 1]])
-    
-    return cand_idxs
-
-def _findInversions(temp, dewp, pres, trop_idx):
-    lr_layers = np.diff(temp)
-    cand_layers = np.where(lr_layers > 0)[0]
-    groupedLayers = groupLayers(cand_layers)
-    rh = _RH(temp, dewp, pres)
-
-    inversion_layers = []
-    for layer in groupedLayers:
-        lbot = layer[0]
-        ltop = layer[-1]
-        if pres[lbot] < 300 or lbot > trop_idx:
-            break
-        elif (temp[ltop] - temp[lbot] >= 2.5) or \
-             (np.abs(rh[ltop] - rh[lbot]) > 20) or \
-             (pres[lbot] - pres[ltop] >= 20):
-            inversion_layers.append(lbot)
-            inversion_layers.append(ltop)
-#   print inversion_layers
-    return np.asarray(inversion_layers, dtype=int)
-
-def _maxWind(wspd, wdir, pres, min_wspd=(30 * 1.94), min_diff=(10 * 1.94), smooth_pts=11):
+def _maxWind(wspd, min_wspd=(30 * MS2KTS), min_diff=(10 * MS2KTS), smooth_pts=11):
     '''
     _maxWind()
     Purpose:    Find the level of the maximum winds in the profile
@@ -97,11 +146,7 @@ def _maxWind(wspd, wdir, pres, min_wspd=(30 * 1.94), min_diff=(10 * 1.94), smoot
 
     Assumes that the winds are in knots.
     '''
-
-    if np.ma.is_masked(wspd):
-        wspd_mask = wspd.mask
-        wspd = wspd[np.where(~wspd_mask)]
-
+    
     # Smooth the wind profile
     wgts = np.ones((smooth_pts,)) / smooth_pts
     wspd_smooth = np.convolve(wspd, wgts, mode='same')
@@ -131,6 +176,39 @@ def _maxWind(wspd, wdir, pres, min_wspd=(30 * 1.94), min_diff=(10 * 1.94), smoot
 
     return max_idxs
 
+def _windSigLevels(standard='RWS', **snd):
+    wdir = _removedMasked(snd['wdir'])
+    wspd = _removedMasked(snd['wspd'])
+
+    wdir_unfold = _unfoldWindDir(wdir)
+
+    max_wind_sl = _maxWind(wspd)
+    wind_spd_sl = _splitProfile(wspd, 0, 5 * MS2KTS)
+    wind_dir_sl = _splitProfile(wdir_unfold, 0, 10)
+
+    wind_sl = np.unique(np.concatenate((max_wind_sl, wind_spd_sl, wind_dir_sl)))
+    return np.sort(wind_sl)
+
+def _findInversions(temp, dewp, pres, trop_idx):
+    lr_layers = np.diff(temp)
+    cand_layers = np.where(lr_layers > 0)[0]
+    groupedLayers = _groupLayers(cand_layers)
+    rh = _RH(temp, dewp, pres)
+
+    inversion_layers = []
+    for layer in groupedLayers:
+        lbot = layer[0]
+        ltop = layer[-1]
+        if pres[lbot] < 300 or lbot > trop_idx:
+            break
+        elif (temp[ltop] - temp[lbot] >= 2.5) or \
+             (np.abs(rh[ltop] - rh[lbot]) > 20) or \
+             (pres[lbot] - pres[ltop] >= 20):
+            inversion_layers.append(lbot)
+            inversion_layers.append(ltop)
+#   print inversion_layers
+    return np.asarray(inversion_layers, dtype=int)
+
 def _findIsothermals(temp, pres, tol=0.5):
     """
     _findIsothermals()
@@ -144,24 +222,6 @@ def _findIsothermals(temp, pres, tol=0.5):
                     Temperature tolerance on "isothermal."  Default is 0.5 C.
     Returns:    A list of indices of the tops and bottoms of isothermal layers.
     """
-
-    def groupLayers(cand_layers):
-        """
-        Function to group candidate layers into contiguous regions.
-        """
-        group_layers = np.where(np.diff(cand_layers) == 1, 1, 0)
-        try:
-            breaks = np.where(group_layers == 0)[0] + 1
-        except IndexError:
-            breaks = []
-        breaks = [ 0 ] + list(breaks) + [ -1 ]
-
-        cand_idxs = []
-        for idx in xrange(len(breaks) - 1):
-            cand_idxs.append(cand_layers[breaks[idx]:breaks[idx + 1]])
-        
-        return cand_idxs
-
     def pareLayer(cand_idxs):
         """
         Function to take a layer and pare it down to only the truly isothermal
@@ -176,7 +236,7 @@ def _findIsothermals(temp, pres, tol=0.5):
             worst = np.argmax(temp_layer - temp_layer.mean())
             cand_idxs = np.delete(cand_idxs, worst)
 
-            cand_idxs = groupLayers(cand_idxs)
+            cand_idxs = _groupLayers(cand_idxs)
             if len(cand_idxs) == 1:
                 cand_idxs = cand_idxs[0]
             else:
@@ -200,7 +260,7 @@ def _findIsothermals(temp, pres, tol=0.5):
 
     lr_layers = np.abs(np.diff(temp))
     cand_layers = np.where(lr_layers < 2 * tol)[0]
-    cand_idxs = groupLayers(cand_layers)
+    cand_idxs = _groupLayers(cand_layers)
 
     for cand_idx in cand_idxs:
         cand_idx = pareLayer(cand_idx)
@@ -210,35 +270,15 @@ def _findIsothermals(temp, pres, tol=0.5):
 
     return isotherm_idxs
 
-def _mandatoryPresLevels(pres, tol=0.1):
-    '''
-        Searches for the surface, 1000, 925, 850, 700,
-        500, 400, 300, 250, 200, 150, 100, 70, 50, 30, 20, and 10 mb.
-    '''
-    mandatory_pres = np.asarray([1000, 925, 850, 700, 500, 400, 300, 250, 200,\
-                      150, 100, 70, 50, 30, 20, 10])
-    mandatory_pres_idx = np.ones(mandatory_pres.shape, dtype=int)
-    pres = np.round(pres,0)
-    for i in xrange(len(mandatory_pres_idx)):
-        ind = np.where(np.fabs(pres - mandatory_pres[i]) < tol)[0]
-        if len(ind) == 0:
-            ind = [-9999]
-        mandatory_pres_idx[i] = ind[0]
+def _findAddSigLevels(temp, pres, trop_idx, tol=[1.0, 2.0], max_trop=300):
 
-    return mandatory_pres_idx
-
-def _findAddSigLevels(temp, pres, trop_idx, tol=[1.0, 2.0]):
-
-    cutoff_idx = min(np.argmin(np.abs(pres - 300)), trop_idx)
+    cutoff_idx = min(np.argmin(np.abs(pres - max_trop)), trop_idx)
 
     idxs_below = _splitProfile(temp[:cutoff_idx], 0, tol[0])[:-1]
     idxs_above = _splitProfile(temp[cutoff_idx:], cutoff_idx, tol[1])
     additional_idxs = np.sort(np.unique(np.concatenate((idxs_below, idxs_above))))
 
     return additional_idxs
-
-def _RH(temp, dwpt, pres):
-    return 100*(np.exp((17.625*dwpt)/(243.04+dwpt))/np.exp((17.625*temp)/(243.04+temp))) 
 
 def _findSigRHLevels(temp, dwpt, pres, tol=[15]):
     """
@@ -262,7 +302,7 @@ def _findSigRHLevels(temp, dwpt, pres, tol=[15]):
 
     return additional_idxs
 
-def _thermSigLevels(**snd):
+def _thermSigLevels(standard='RWS', **snd):
     """
     _thermSigLevels()
     Purpose:    Find the temperature significant levels
@@ -271,55 +311,27 @@ def _thermSigLevels(**snd):
                     levels.
     """
 
-    trop_idx = _findTropopause(**snd)
+    if standard == 'RWS':
+        temp_tol = [0.5, 1.0]
+        rh_tol = [5.]
+        trop_idx = len(snd['pres']) 
+        max_trop = 100.
+
+    elif standard == 'WMO':
+        temp_tol = [1.0, 2.0]
+        rh_tol = [10.]
+        trop_idx = _findTropopause(**snd)
+        max_trop = 300.
 
     inv_sl = _findInversions(snd['temp'], snd['dewp'], snd['pres'], trop_idx)
     iso_sl = _findIsothermals(snd['temp'], snd['pres'])
-    add_sl = _findAddSigLevels(snd['temp'], snd['pres'], trop_idx)
+    add_sl = _findAddSigLevels(snd['temp'], snd['pres'], trop_idx, tol=temp_tol, max_trop=max_trop)
+    rh_sl = _findSigRHLevels(snd['temp'], snd['dewp'], snd['pres'], tol=rh_tol)
 
-    therm_sl = np.concatenate((inv_sl, iso_sl, add_sl))
+    therm_sl = np.unique(np.concatenate((inv_sl, iso_sl, add_sl, rh_sl)))
     return np.sort(therm_sl)
 
-def reverseDiff(array):
-    return array[1:] + array[:-1]
-
-def _highestLevel(**snd):
-    return np.ma.argmin(snd['pres'])
-
-def _findTropopause(**snd):
-    '''
-        Finding the tropopause level using the WMO definition of a 
-        tropopause as being the lowest level where the 2 km layer
-        aloft has a lapse rate greater than 2 C/km.
-        
-        The algorithm below was taken from:
-        http://www.inscc.utah.edu/~reichler/publications/papers/2003_tropo.pdf
-    '''
-    above_500 = np.where((snd['pres'] > 75) & (snd['pres'] < 550))[0]
-    dT = np.diff(snd['temp'][above_500])
-    dp = np.diff(snd['pres'][above_500])
-    at = reverseDiff(snd['temp'][above_500])
-    ap = reverseDiff(snd['pres'][above_500])
-    ah = reverseDiff(snd['hght'][above_500])
-    R = 287.
-    g = 9.81
-    Cp = 1004.
-    kappa = R / Cp
-
-    halfp = ap / 2.
-    halfh = ah / 2.
-    halfgamma = (dT/dp) * (ap/at) * (kappa * g/R)
-    idx = np.where(halfgamma > 0.002)[0]
-    for i in idx:
-        hbot = halfh[i]
-        htop = hbot + 2000.
-        htop_idx = np.argmin(np.abs(halfh - htop))
-        mean_lapse = np.mean(halfgamma[i:htop_idx])
-        if mean_lapse > 0.002:
-            return np.ma.argmin(np.fabs(snd['pres']-halfp[i]))    
-    return np.nan
-
-def soundingFilter(**snd):
+def soundingFilter(standard='RWS', **snd):
     """
     soundingFilter()
     Purpose:    Filter high-resolution sounding observations by finding the 
@@ -343,13 +355,16 @@ def soundingFilter(**snd):
 
     pres_ml = _mandatoryPresLevels(snd['pres'])
     trop_idx = _findTropopause(**snd)
-    therm_sl = _thermSigLevels(**snd)
-    rh_sl = _findSigRHLevels(snd['temp'], snd['dewp'], snd['pres'])
-    wind_sl = _windSigLevels(**snd)
+    therm_sl = _thermSigLevels(standard=standard, **snd)
+    wind_sl = _windSigLevels(standard=standard, **snd)
 
-    all_idxs = np.concatenate((pres_ml, [trop_idx], therm_sl, rh_sl, wind_sl))
+    pres_ml = np.asarray(pres_ml[pres_ml >= 0], dtype=int)
+
+    all_idxs = np.concatenate((pres_ml, [trop_idx], therm_sl, wind_sl))
     all_idxs = np.unique(all_idxs[np.isfinite(all_idxs)])
-    all_idxs = np.asarray(all_idxs[all_idxs >= 0], dtype=int)
+
+    therm_idxs = np.concatenate((pres_ml, [trop_idx], therm_sl))
+    wind_idxs = np.concatenate((pres_ml, [trop_idx], wind_sl))
 
     """
     ticks = np.concatenate((np.arange(1000,0,-100), [50,30, 20, 10]))
@@ -359,15 +374,15 @@ def soundingFilter(**snd):
     xlabel("Temperature [C]")
     plot(snd['temp'], snd['pres'], 'r-')
     plot(snd['dewp'], snd['pres'], 'g-')
-    plot(snd['temp'][all_idxs], snd['pres'][all_idxs], 'ko')
-    plot(snd['dewp'][all_idxs], snd['pres'][all_idxs], 'ko') 
+    plot(snd['temp'][therm_idxs], snd['pres'][therm_idxs], 'ko')
+    plot(snd['dewp'][therm_idxs], snd['pres'][therm_idxs], 'ko') 
     gca().invert_yaxis()
     yticks(ticks, np.asarray(ticks, dtype=str))
     subplot(122)
     gca().set_yscale('log')
     xlabel("Wind Speed [kts]")
     plot(snd['wspd'], snd['pres'], 'b-')
-    plot(snd['wspd'][all_idxs], snd['pres'][all_idxs], 'ko')
+    plot(snd['wspd'][wind_idxs], snd['pres'][wind_idxs], 'ko')
     yticks(ticks, np.asarray(ticks, dtype=str))
     gca().invert_yaxis()
     show()
@@ -384,11 +399,11 @@ def soundingFilter(**snd):
     wind_sl[missing_wind] = pres_sl[missing_wind]
 
     snd_filtered = {
-        'temp':np.where(therm_sl == -1, np.nan, snd['temp'][therm_sl]), 
-        'dewp':np.where(therm_sl == -1, np.nan, snd['dewp'][therm_sl]),
+        'temp':np.where(therm_sl == -1, MISSING, snd['temp'][therm_sl]), 
+        'dewp':np.where(therm_sl == -1, MISSING, snd['dewp'][therm_sl]),
         'pres':snd['pres'][pres_sl],
-        'wspd':np.where(wind_sl == -1, np.nan, snd['wspd'][wind_sl]),
-        'wdir':np.where(wind_sl == -1, np.nan, snd['wdir'][wind_sl])
+        'wspd':np.where(wind_sl == -1, MISSING, snd['wspd'][wind_sl]),
+        'wdir':np.where(wind_sl == -1, MISSING, snd['wdir'][wind_sl])
     }
 
     return snd_filtered
