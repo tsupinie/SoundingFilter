@@ -32,6 +32,45 @@ def _groupLayers(cand_layers):
     
     return cand_idxs
 
+def _splitProfile(prof, lb_idx, tol, _depth=0):
+    """
+    _splitProfile()
+    Purpose:    Thin a profile in such a way that none of the intermediate 
+                    values deviate from a linear interplation of the thinned
+                    values by more than a specified tolerance.
+    Arguments:  prof [type=np.ndarray]
+                    The profile to thin
+                lb_idx [type=int]
+                    The position (in the full profile) of the first index in 
+                    this segment of the profile.
+                tol [type=float]
+                    Tolerance on the linear interpolation
+    Returns:    A list of indices representing those in the thinned profile
+                    
+    """
+    interp = interp1d([0., len(prof) - 1.], [prof[0], prof[-1]])
+    interp_prof = interp(np.arange(float(len(prof))))
+
+    if np.abs(interp_prof - prof).max() < tol:
+        ret_val = [ lb_idx ]
+    else:
+        split_point = np.argmax(np.abs(prof - interp_prof))
+        if split_point > 1:
+            first_split = _splitProfile(prof[:split_point], lb_idx, tol, _depth=_depth + 1)
+        else:
+            first_split = [ lb_idx ]
+
+        if split_point < len(prof) - 2:
+            second_split = _splitProfile(prof[split_point:], lb_idx + split_point, tol, _depth=_depth + 1)
+        else:
+            second_split = [ lb_idx + split_point ]
+
+        ret_val = first_split + second_split
+
+    if _depth == 0:
+        ret_val += [ len(prof) - 1 ]
+    return ret_val
+
 def _mandatoryPresLevels(pres, tol=0.1):
     '''
         Searches for the surface, 1000, 925, 850, 700,
@@ -85,45 +124,6 @@ def _findTropopause(**snd):
         if mean_lapse > 0.002:
             return np.ma.argmin(np.fabs(snd['pres']-halfp[i]))    
     return MISSING
-
-def _splitProfile(prof, lb_idx, tol, _depth=0):
-    """
-    _splitProfile()
-    Purpose:    Thin a profile in such a way that none of the intermediate 
-                    values deviate from a linear interplation of the thinned
-                    values by more than a specified tolerance.
-    Arguments:  prof [type=np.ndarray]
-                    The profile to thin
-                lb_idx [type=int]
-                    The position (in the full profile) of the first index in 
-                    this segment of the profile.
-                tol [type=float]
-                    Tolerance on the linear interpolation
-    Returns:    A list of indices representing those in the thinned profile
-                    
-    """
-    interp = interp1d([0., len(prof) - 1.], [prof[0], prof[-1]])
-    interp_prof = interp(np.arange(float(len(prof))))
-
-    if np.abs(interp_prof - prof).max() < tol:
-        ret_val = [ lb_idx ]
-    else:
-        split_point = np.argmax(np.abs(prof - interp_prof))
-        if split_point > 1:
-            first_split = _splitProfile(prof[:split_point], lb_idx, tol, _depth=_depth + 1)
-        else:
-            first_split = [ lb_idx ]
-
-        if split_point < len(prof) - 2:
-            second_split = _splitProfile(prof[split_point:], lb_idx + split_point, tol, _depth=_depth + 1)
-        else:
-            second_split = [ lb_idx + split_point ]
-
-        ret_val = first_split + second_split
-
-    if _depth == 0:
-        ret_val += [ len(prof) - 1 ]
-    return ret_val
 
 def _unfoldWindDir(wdir):
     fold_idxs = np.where((wdir[:-1] > 350) & (wdir[1:] < 10) | (wdir[:-1] < 10) & (wdir[1:] > 350))[0]
@@ -331,7 +331,7 @@ def _thermSigLevels(standard='RWS', **snd):
     therm_sl = np.unique(np.concatenate((inv_sl, iso_sl, add_sl, rh_sl)))
     return np.sort(therm_sl)
 
-def soundingFilter(standard='RWS', **snd):
+def soundingFilter(missing=MISSING, standard='RWS', **snd):
     """
     soundingFilter()
     Purpose:    Filter high-resolution sounding observations by finding the 
@@ -399,11 +399,12 @@ def soundingFilter(standard='RWS', **snd):
     wind_sl[missing_wind] = pres_sl[missing_wind]
 
     snd_filtered = {
-        'temp':np.where(therm_sl == -1, MISSING, snd['temp'][therm_sl]), 
-        'dewp':np.where(therm_sl == -1, MISSING, snd['dewp'][therm_sl]),
+        'temp':snd['temp'][pres_sl], #np.where(therm_sl == -1, missing, snd['temp'][therm_sl]), 
+        'dewp':snd['dewp'][pres_sl], #np.where(therm_sl == -1, missing, snd['dewp'][therm_sl]),
         'pres':snd['pres'][pres_sl],
-        'wspd':np.where(wind_sl == -1, MISSING, snd['wspd'][wind_sl]),
-        'wdir':np.where(wind_sl == -1, MISSING, snd['wdir'][wind_sl])
+        'hght':snd['hght'][pres_sl],
+        'wspd':np.where(wind_sl == -1, missing, snd['wspd'][wind_sl]),
+        'wdir':np.where(wind_sl == -1, missing, snd['wdir'][wind_sl])
     }
 
     return snd_filtered
