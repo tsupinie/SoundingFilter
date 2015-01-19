@@ -47,9 +47,8 @@ def _splitProfile(prof, lb_idx, tol, _depth=0):
 
 def _windSigLevels(**snd):
     max_wind_sl = _maxWind(snd['wspd'], snd['wdir'], snd['pres'])
-    idxs_windSpdSig = _splitProfile(snd['wspd']*0.514444, 0, 5)
-    idxs = idxs_windSpdSig
-    return idxs
+    wind_spd_sl = _splitProfile(snd['wspd']*0.514444, 0, 5)
+    return np.concatenate((max_wind_sl, wind_spd_sl))
 
 
 def groupLayers(cand_layers):
