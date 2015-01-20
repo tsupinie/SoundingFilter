@@ -2,7 +2,9 @@
 A function to filter high-resolution sounding data in a manner similar to routinely-available sounding data.  It's not perfect, but it's close.
 
 *Authors*:
+
 Greg Blumberg
+
 Tim Supinie
 
 <h1>Procedures</h1>
@@ -36,41 +38,55 @@ The tropopause is defined as the lowest level at which the lapse rate decreases 
 <h3>Level of maximum wind</h3>
 
 For coding purposes, a maximum wind level:
+
 (a) Shall be determined by consideration of the list of significant levels for wind speed, as
 obtained by means of the relevant recommended or equivalent national method and not by consideration of the original wind-speed curve;
+
 (b) Shall be located above the 500-hPa isobaric surface and shall correspond to a speed
 of more than 30 metres per second.
 *Note:* A maximum wind level is defined as a level at which the wind speed is greater than that observed immediately above and below that level.
 
 Whenever more than one maximum wind level exists, these levels shall be reported as follows:
+
 (a) The level of greatest maximum wind speed shall be transmitted first;
+
 (b) The other levels shall be classified in descending order of speed and be transmitted
 only if their speed exceeds those of the two adjacent minimals by at least 10 metres
 per second;
+
 (c) The levels of maximum wind with the same speed shall be encoded successively,
 beginning with the lowest one;
+
 (d) Furthermore, the highest level attained by the sounding shall be transmitted, provided:
+
 (i) It satisfies the criteria set forth in Regulation 32.2.3.1 above [the one listed above this section];
+
 (ii) It constitutes the level of the greatest speed of the whole sounding.
 
 <h2>Significant Levels</h2>
 
 The reported significant data alone shall make it possible to reconstruct the wind profile with sufficient accuracy for practical use. Care shall be taken that:
+
 (a) The direction and speed curves (in function of the log of pressure or altitude) can be
 reproduced with their prominent characteristics;
+
 (b) These curves can be reproduced with an accuracy of at least 10° for direction and five
 metres per second for speed;
+
 (c) The number of significant levels is kept strictly to a necessary minimum.
 
 *Note:* To satisfy these criteria, the following method of successive approximations is recommended, but other methods of attaining equivalent results may suit some national practices better and may be used:
 
 (1) The surface level and the highest level attained by the sounding constitute the first and the last significant levels.
 The deviation from the linearly interpolated values between these two levels is then considered. If no direction deviates by more than 10° and no speed by more than five metres per second, no other significant level need be reported. Whenever one parameter deviates by more than the limit specified in paragraph (b) above, the level of greatest deviation becomes a supplementary significant level for both parameters.
+
 (2) The additional significant levels so introduced divide the sounding into two layers. In each separate layer, the deviations from the linearly interpolated values between the base and the top are then considered. The process used in paragraph (1) above is repeated and yields other significant levels. These additional levels in turn modify the layer distribution, and the method is applied again until any level is approximated to the above-mentioned specified values.
 
 For the purpose of computational work, it should be noted that the values derived from a PILOT report present two different resolutions:
+
 (a) Winds at significant levels are reported to the resolution of 5° in direction and one metre per
 second in speed;
+
 (b) Any interpolated wind at a level between two significant levels is implicitly reported to the
 resolution of ± 10° in direction and ± 5 metres per second in speed.
 
