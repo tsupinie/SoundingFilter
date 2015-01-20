@@ -93,6 +93,7 @@ resolution of ± 10° in direction and ± 5 metres per second in speed.
 <h2>Mandatory Significant Levels</h2>
 
 The following shall be included as “mandatory significant levels”:
+
 (a) Surface level and the highest level of the sounding, or aircraft reference level and ter-
 mination level for descent soundings;
 
