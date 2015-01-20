@@ -137,7 +137,7 @@ def _unfoldWindDir(wdir):
 
     return wdir_unfold
 
-def _maxWind(wspd, min_wspd=(30 * MS2KTS), min_diff=(10 * MS2KTS), smooth_pts=11):
+def _findMaxWind(wspd, min_wspd=(30 * MS2KTS), min_diff=(10 * MS2KTS), smooth_pts=11):
     '''
     _maxWind()
     Purpose:    Find the level of the maximum winds in the profile
@@ -182,9 +182,12 @@ def _windSigLevels(standard='RWS', **snd):
 
     wdir_unfold = _unfoldWindDir(wdir)
 
-    max_wind_sl = _maxWind(wspd)
-    wind_spd_sl = _splitProfile(wspd, 0, 5 * MS2KTS)
-    wind_dir_sl = _splitProfile(wdir_unfold, 0, 10)
+    wspd_tol = 0.5 * MS2KTS
+    wdir_tol = 10
+
+    max_wind_sl = _findMaxWind(wspd)
+    wind_spd_sl = _splitProfile(wspd, 0, wspd_tol)
+    wind_dir_sl = _splitProfile(wdir_unfold, 0, wdir_tol)
 
     wind_sl = np.unique(np.concatenate((max_wind_sl, wind_spd_sl, wind_dir_sl)))
     return np.sort(wind_sl)
