@@ -363,13 +363,13 @@ def soundingFilter(missing=MISSING, standard='RWS', **snd):
 
     pres_ml = np.asarray(pres_ml[pres_ml >= 0], dtype=int)
 
+    """
     all_idxs = np.concatenate((pres_ml, [trop_idx], therm_sl, wind_sl))
     all_idxs = np.unique(all_idxs[np.isfinite(all_idxs)])
 
     therm_idxs = np.concatenate((pres_ml, [trop_idx], therm_sl))
     wind_idxs = np.concatenate((pres_ml, [trop_idx], wind_sl))
 
-    """
     ticks = np.concatenate((np.arange(1000,0,-100), [50,30, 20, 10]))
     subplot(121)
     gca().set_yscale('log')
@@ -390,6 +390,9 @@ def soundingFilter(missing=MISSING, standard='RWS', **snd):
     gca().invert_yaxis()
     show()
     """
+
+    therm_sl = np.concatenate((therm_sl, pres_ml, [ trop_idx ]))
+    wind_sl = np.concatenate((wind_sl, pres_ml, [ trop_idx ]))
 
     pres_sl = np.union1d(therm_sl, wind_sl)
     missing_therm = np.searchsorted(pres_sl, therm_sl)
