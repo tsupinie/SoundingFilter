@@ -1,47 +1,46 @@
-MANDATORY LEVELS:
+<h1>SoundingFilter</h1>
+A function to filter high-resolution sounding data in a manner similar to routinely-available sounding data.  It's not perfect, but it's close.
 
-Mandatory pressure levels:
-1000 mb
-925 mb
-850 mb
-700 mb
-500 mb
-400 mb
-300 mb
-250 mb
-200 mb
-150 mb
-100 mb
-70 mb 
-50 mb
-30 mb
-20 mb
-10 mb
+*Authors*:
+Greg Blumberg
+Tim Supinie
 
-Tropopause level:
-When more than one tropopause is observed, each shall be reported by repeating Section 3. 
-N O T E : For a definition of tropopause, see publication WMO-No. 182 — International
-Meteorological Vocabulary (copied below):
+<h1>Procedures</h1>
+<h2>Mandatory Levels</h2>
 
-tropopause
-SOURCE:
-International Meteorological Vocabulary, WMO - No. 182 
-RELIABILITY:
-Confirmed 
-DEFINITION:
-The boundary between the troposphere and the stratosphere, where an abrupt change in lapse rate usually occurs. It is defined as the lowest level at which the lapse rate decreases to 2˚C km-1 or less, provided that the average lapse rate between this level and all higher levels within 2 km does not exceed 2˚C km-1. Occasionally, a second tropopause may be found if the lapse rate above the first tropopause exceeds 3˚C km-1. 
-DEFINITION SOURCE:
-International Meteorological Vocabulary, WMO - No. 182 
+<h3>Mandatory pressure levels</h3>
+<ul>
+<li>1000 mb
+<li>925 mb
+<li>850 mb
+<li>700 mb
+<li>500 mb
+<li>400 mb
+<li>300 mb
+<li>250 mb
+<li>200 mb
+<li>150 mb
+<li>100 mb
+<li>70 mb 
+<li>50 mb
+<li>30 mb
+<li>20 mb
+<li>10 mb
+</ul>
 
-Level of maximum wind:
+<h3>Tropopause level</h3>
+When more than one tropopause is observed, each shall be reported.
+
+The tropopause is defined as the lowest level at which the lapse rate decreases to 2˚C km-1 or less, provided that the average lapse rate between this level and all higher levels within 2 km does not exceed 2˚C km-1. Occasionally, a second tropopause may be found if the lapse rate above the first tropopause exceeds 3˚C km-1. 
+
+<h3>Level of maximum wind</h3>
 
 For coding purposes, a maximum wind level:
 (a) Shall be determined by consideration of the list of significant levels for wind speed, as
-obtained by means of the relevant recommended or equivalent national method (see
-Note under Regulation 32.3.1) and not by consideration of the original wind-speed curve;
+obtained by means of the relevant recommended or equivalent national method and not by consideration of the original wind-speed curve;
 (b) Shall be located above the 500-hPa isobaric surface and shall correspond to a speed
 of more than 30 metres per second.
-N O T E : A maximum wind level is defined as a level at which the wind speed is greater than that observed immediately above and below that level.
+*Note:* A maximum wind level is defined as a level at which the wind speed is greater than that observed immediately above and below that level.
 
 Whenever more than one maximum wind level exists, these levels shall be reported as follows:
 (a) The level of greatest maximum wind speed shall be transmitted first;
@@ -54,7 +53,7 @@ beginning with the lowest one;
 (i) It satisfies the criteria set forth in Regulation 32.2.3.1 above [the one listed above this section];
 (ii) It constitutes the level of the greatest speed of the whole sounding.
 
-SIGNIFICANT LEVELS:
+<h2>Significant Levels</h2>
 
 The reported significant data alone shall make it possible to reconstruct the wind profile with sufficient accuracy for practical use. Care shall be taken that:
 (a) The direction and speed curves (in function of the log of pressure or altitude) can be
@@ -63,11 +62,11 @@ reproduced with their prominent characteristics;
 metres per second for speed;
 (c) The number of significant levels is kept strictly to a necessary minimum.
 
-N O T E : To satisfy these criteria, the following method of successive approximations is recommended, but other methods of attaining equivalent results may suit some national practices better and may be used:
+*Note:* To satisfy these criteria, the following method of successive approximations is recommended, but other methods of attaining equivalent results may suit some national practices better and may be used:
 
 (1) The surface level and the highest level attained by the sounding constitute the first and the last significant levels.
 The deviation from the linearly interpolated values between these two levels is then considered. If no direction deviates by more than 10° and no speed by more than five metres per second, no other significant level need be reported. Whenever one parameter deviates by more than the limit specified in paragraph (b) above, the level of greatest deviation becomes a supplementary significant level for both parameters.
-(2) The additional significant levels so introduced divide the sounding into two layers. In each separate layer, the deviations from the linearly interpolated values between the base and the top are then considered. The process used in paragraph (1) above is repeated and yields other signifi- cant levels. These additional levels in turn modify the layer distribution, and the method is applied again until any level is approximated to the above-mentioned specified values.
+(2) The additional significant levels so introduced divide the sounding into two layers. In each separate layer, the deviations from the linearly interpolated values between the base and the top are then considered. The process used in paragraph (1) above is repeated and yields other significant levels. These additional levels in turn modify the layer distribution, and the method is applied again until any level is approximated to the above-mentioned specified values.
 
 For the purpose of computational work, it should be noted that the values derived from a PILOT report present two different resolutions:
 (a) Winds at significant levels are reported to the resolution of 5° in direction and one metre per
@@ -75,8 +74,7 @@ second in speed;
 (b) Any interpolated wind at a level between two significant levels is implicitly reported to the
 resolution of ± 10° in direction and ± 5 metres per second in speed.
 
-
-MANDATORY SIGNIFICANT LEVELS:
+<h2>Mandatory Significant Levels</h2>
 
 The following shall be included as “mandatory significant levels”:
 (a) Surface level and the highest level of the sounding, or aircraft reference level and ter-
@@ -88,24 +86,13 @@ mination level for descent soundings;
 provided that the base of the layer occurs below the 300-hPa level or the first
 tropopause, whichever is the higher;
 
-(d) Bases and tops of inversion layers which are characterized by a change in tempera-
-ture of at least 2.5°C or a change in relative humidity of at least 20 per cent, provided that the base of the layer occurs below the 300-hPa level or the first tropopause, whichever is the higher.
+(d) Bases and tops of inversion layers which are characterized by a change in temperature of at least 2.5°C or a change in relative humidity of at least 20 per cent, provided that the base of the layer occurs below the 300-hPa level or the first tropopause, whichever is the higher.
 
-N O T E : The inversion layers of (c) and (d) may be comprised of several thinner inversion layers sep- arated by thin layers of temperature lapse. To allow for this situation, the tops of the inversion layers of (c) and (d) shall each be at a level such that no further inversion layers, whether thick or thin, shall occur for at least 20 hPa above the level.
+*Note:* The inversion layers of (c) and (d) may be comprised of several thinner inversion layers separated by thin layers of temperature lapse. To allow for this situation, the tops of the inversion layers of (c) and (d) shall each be at a level such that no further inversion layers, whether thick or thin, shall occur for at least 20 hPa above the level.
 
-N O T E : Criteria for determining significant levels with respect to changes in wind speed and direction are given in Regulation 32.3.1.
+*Note:* Criteria for determining significant levels with respect to changes in wind speed and direction are given in Regulation 32.3.1.
 
-Defintion of inversion layer:
-SOURCE:
-International Meteorological Vocabulary, WMO - No. 182 
-RELIABILITY:
-Confirmed 
-DEFINITION:
-Atmospheric layer in which the temperature increases or remains constant with height. 
-DEFINITION SOURCE:
-International Meteorological Vocabulary, WMO - No. 182 
-
-ADDITIONAL LEVELS:
+<h2>Additional Levels</h2>
 
 The following shall be included as “additional levels”. They shall be selected in the order given, thereby giving priority to representing the temperature profile. As far as possible, these additional levels shall be the actual levels at which prominent changes in the lapse rate of air temperature occur:
 
