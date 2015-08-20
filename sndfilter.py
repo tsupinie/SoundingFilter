@@ -93,36 +93,32 @@ def _findTropopause(**snd):
         Finding the tropopause level using the WMO definition of a 
         tropopause as being the lowest level where the 2 km layer
         aloft has a lapse rate greater than 2 C/km.
-        
-        The algorithm below was taken from:
-        http://www.inscc.utah.edu/~reichler/publications/papers/2003_tropo.pdf
     '''
 
-    def reverseDiff(array):
-        return array[1:] + array[:-1]
+    def mean(array):
+        return (array[1:] + array[:-1]) * 0.5
 
     above_500 = np.where((snd['pres'] > 75) & (snd['pres'] < 550))[0]
-    dT = np.diff(snd['temp'][above_500])
-    dp = np.diff(snd['pres'][above_500])
-    at = reverseDiff(snd['temp'][above_500])
-    ap = reverseDiff(snd['pres'][above_500])
-    ah = reverseDiff(snd['hght'][above_500])
-    R = 287.
-    g = 9.81
-    Cp = 1004.
-    kappa = R / Cp
+    temp = snd['temp'][above_500]
+    hght = snd['hght'][above_500]
+    dT = np.diff(temp)
+    dz = np.diff(hght)
+    mean_z = mean(hght)
 
-    halfp = ap / 2.
-    halfh = ah / 2.
-    halfgamma = (dT/dp) * (ap/at) * (kappa * g/R)
-    idx = np.where(halfgamma > 0.002)[0]
+    gamma = dT / dz
+
+    keep_gamma = np.isfinite(gamma) & (gamma > 0.002)
+    if type(gamma) == np.ma.core.MaskedArray:
+        keep_gamma &= (~gamma.mask)
+    idx = np.where(keep_gamma)[0]
+
     for i in idx:
-        hbot = halfh[i]
+        hbot = mean_z[i]
         htop = hbot + 2000.
-        htop_idx = np.argmin(np.abs(halfh - htop))
-        mean_lapse = np.mean(halfgamma[i:htop_idx])
+        htop_idx = np.argmin(np.abs(mean_z - htop))
+        mean_lapse = (temp[htop_idx] - temp[i]) / (hght[htop_idx] - hght[i])
         if mean_lapse > 0.002:
-            return np.ma.argmin(np.fabs(snd['pres']-halfp[i]))    
+            return above_500[i]
     return MISSING
 
 def _unfoldWindDir(wdir):
@@ -209,7 +205,6 @@ def _findInversions(temp, dewp, pres, trop_idx):
              (pres[lbot] - pres[ltop] >= 20):
             inversion_layers.append(lbot)
             inversion_layers.append(ltop)
-#   print inversion_layers
     return np.asarray(inversion_layers, dtype=int)
 
 def _findIsothermals(temp, pres, tol=0.5):
@@ -354,8 +349,6 @@ def soundingFilter(missing=MISSING, standard='RWS', **snd):
                     levels, missing observations will be filled with np.nan.
     """
 
-    from datetime import datetime
-
     pres_ml = _mandatoryPresLevels(snd['pres'])
     trop_idx = _findTropopause(**snd)
     therm_sl = _thermSigLevels(standard=standard, **snd)
@@ -363,36 +356,11 @@ def soundingFilter(missing=MISSING, standard='RWS', **snd):
 
     pres_ml = np.asarray(pres_ml[pres_ml >= 0], dtype=int)
 
-    """
-    all_idxs = np.concatenate((pres_ml, [trop_idx], therm_sl, wind_sl))
-    all_idxs = np.unique(all_idxs[np.isfinite(all_idxs)])
-
-    therm_idxs = np.concatenate((pres_ml, [trop_idx], therm_sl))
-    wind_idxs = np.concatenate((pres_ml, [trop_idx], wind_sl))
-
-    ticks = np.concatenate((np.arange(1000,0,-100), [50,30, 20, 10]))
-    subplot(121)
-    gca().set_yscale('log')
-    ylabel("Pressure [mb]")
-    xlabel("Temperature [C]")
-    plot(snd['temp'], snd['pres'], 'r-')
-    plot(snd['dewp'], snd['pres'], 'g-')
-    plot(snd['temp'][therm_idxs], snd['pres'][therm_idxs], 'ko')
-    plot(snd['dewp'][therm_idxs], snd['pres'][therm_idxs], 'ko') 
-    gca().invert_yaxis()
-    yticks(ticks, np.asarray(ticks, dtype=str))
-    subplot(122)
-    gca().set_yscale('log')
-    xlabel("Wind Speed [kts]")
-    plot(snd['wspd'], snd['pres'], 'b-')
-    plot(snd['wspd'][wind_idxs], snd['pres'][wind_idxs], 'ko')
-    yticks(ticks, np.asarray(ticks, dtype=str))
-    gca().invert_yaxis()
-    show()
-    """
-
-    therm_sl = np.concatenate((therm_sl, pres_ml, [ trop_idx ]))
-    wind_sl = np.concatenate((wind_sl, pres_ml, [ trop_idx ]))
+    therm_sl = np.concatenate((therm_sl, pres_ml))
+    wind_sl = np.concatenate((wind_sl, pres_ml))
+    if np.isfinite(trop_idx):
+        therm_sl = np.concatenate((therm_sl, [ trop_idx ]))
+        wind_sl = np.concatenate((wind_sl, [ trop_idx ]))
 
     pres_sl = np.union1d(therm_sl, wind_sl)
     missing_therm = np.searchsorted(pres_sl, therm_sl)
