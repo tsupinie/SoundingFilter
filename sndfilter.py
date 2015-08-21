@@ -326,7 +326,9 @@ def _thermSigLevels(standard='RWS', **snd):
     add_sl = _findAddSigLevels(snd['temp'], snd['pres'], trop_idx, tol=temp_tol, max_trop=max_trop)
     rh_sl = _findSigRHLevels(snd['temp'], snd['dewp'], snd['pres'], tol=rh_tol)
 
-    therm_sl = np.unique(np.concatenate((inv_sl, iso_sl, add_sl, rh_sl)))
+    therm_sl = np.unique(np.concatenate((inv_sl, add_sl, rh_sl)))
+    if iso_sl != []:
+        therm_sl = np.unique(np.concatenate((therm_sl, iso_sl)))
     return np.sort(therm_sl)
 
 def soundingFilter(missing=MISSING, standard='RWS', **snd):
@@ -358,6 +360,7 @@ def soundingFilter(missing=MISSING, standard='RWS', **snd):
 
     therm_sl = np.concatenate((therm_sl, pres_ml))
     wind_sl = np.concatenate((wind_sl, pres_ml))
+
     if np.isfinite(trop_idx):
         therm_sl = np.concatenate((therm_sl, [ trop_idx ]))
         wind_sl = np.concatenate((wind_sl, [ trop_idx ]))
